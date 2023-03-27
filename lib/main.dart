@@ -4,6 +4,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'dart:developer' as devtools show log;
+
+extension Log on Object {
+  void log() => devtools.log(toString());
+}
+
 void main() {
   runApp(
       MaterialApp(
@@ -12,8 +18,9 @@ void main() {
           primarySwatch: Colors.blue,
         ),
         debugShowCheckedModeBanner: false,
+        // Injects the BlocProvider into the build context and makes it available throughout it 
         home: BlocProvider(
-          create: (context) => PersonsBloc(),
+          create: (_) => PersonsBloc(),
           child: const HomePage(),
         ),
       )
@@ -106,6 +113,7 @@ class PersonsBloc extends Bloc<LoadPersonsAction, FetchResult?> {
   PersonsBloc() : super(null) {
     on<LoadPersonsAction>(
       // event is input and emit is output
+      // basically, if given an event of LoadPersonsAction type, what do you want as output of FetchResult? type
           (event, emit) async {
         final url = event.url;
         // Checks if the cache contains the person already
@@ -132,7 +140,13 @@ class PersonsBloc extends Bloc<LoadPersonsAction, FetchResult?> {
       },
     );
   }
+}
 
+// Extension on iterable
+extension Subscript<T> on Iterable<T> {
+  // Checks if length of iterable is greater then index or not, if lesser, then return null,
+  // else return element at index.
+  T? operator[](int index) => length > index ? elementAt(index) : null;
 }
 
 class HomePage extends StatelessWidget {
@@ -143,6 +157,61 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home Page'),
+      ),
+      body: Column(
+        children: [
+          Row(
+            children: [
+              TextButton(
+                  onPressed: (){
+                    // gets the PersonsBloc that had been injected into the build context
+                    // add() method is used to give the required parameters into the bloc's on() function
+                    // in the constructor.
+                    context.read<PersonsBloc>().add(
+                        const LoadPersonsAction(
+                            url: PersonUrl.persons1
+                        )
+                    );
+                  },
+                  child: const Text('Load Json #1'),
+              ),
+              TextButton(
+                onPressed: (){
+                  context.read<PersonsBloc>().add(
+                      const LoadPersonsAction(
+                          url: PersonUrl.persons2
+                      )
+                  );
+                },
+                child: const Text('Load Json #2'),
+              ),
+            ],
+          ),
+          
+          BlocBuilder<PersonsBloc, FetchResult?>(
+            // Rebuilds only when previous result is not the same as the current result
+              buildWhen: (previousResult, currentResult) {
+                return previousResult?.persons != currentResult?.persons;
+              },
+              builder: ((context, fetchResult) {
+                fetchResult?.log();
+                final persons = fetchResult?.persons;
+                if (persons == null) {
+                  return const SizedBox();
+                }
+                return Expanded(
+                  child: ListView.builder(
+                      itemCount: persons.length,
+                      itemBuilder: (context, index){
+                        final person = persons[index]!;
+                        return ListTile(
+                          title: Text(person.name),
+                        );
+                      }),
+                );
+              })
+          ),
+        ],
       ),
     );
   }
